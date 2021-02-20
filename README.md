@@ -1,4 +1,4 @@
 ## Setup
 
---npm install
---make dev.db in root of project
+1. npm install
+1. make dev.db in root of project
