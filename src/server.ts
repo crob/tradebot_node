@@ -1,14 +1,17 @@
-import * as express from 'express';
-import * as cors from 'cors';
+import express from 'express';
+import cors from 'cors';
 import { KrakenService } from './services/exchanges/kraken-service';
 import { CoinbaseService } from './services/exchanges/coinbase-service';
 import { BitstampService } from './services/exchanges/bitstamp.service';
 import router from './controllers/users';
-import * as dotenv from 'dotenv';
+import dotenv from 'dotenv';
+import { PrismaService } from './services/prisma-service';
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
+
+PrismaService.getInstance().connect();
 
 app.use(cors());
 app.use(express.json());
@@ -30,18 +33,18 @@ app.listen(port, () => {
   // tslint:disable-next-line:no-console
   console.log(`Server is running: ${port}`);
 
-  CoinbaseService.getInstance().connect(COINBASE_KEY, COINBASE_SECERT, COINBASE_PASSPHRASE);
-  KrakenService.getInstance().connect(KRAKEN_API_KEY, KRAKEN_API_SECRET);
-  BitstampService.getInstance().connect(BITSTAMP_KEY, BITSTAMP_SECRET, BITSTAMP_CLIENT_ID);
+  // CoinbaseService.getInstance().connect(COINBASE_KEY, COINBASE_SECERT, COINBASE_PASSPHRASE);
+  // KrakenService.getInstance().connect(KRAKEN_API_KEY, KRAKEN_API_SECRET);
+  // BitstampService.getInstance().connect(BITSTAMP_KEY, BITSTAMP_SECRET, BITSTAMP_CLIENT_ID);
 
-  (async () => {
-    // tslint:disable-next-line:no-console
-    console.log(await BitstampService.getInstance().getBalance());
-    // tslint:disable-next-line:no-console
-    console.log(await CoinbaseService.getInstance().getBalance());
-    // tslint:disable-next-line:no-console
-    console.log(await KrakenService.getInstance().getBalance());
-    // tslint:disable-next-line:no-console
-    // console.log(await KrakenService.getInstance().getTradablePairs());
-  })();
+  // (async () => {
+  //   // tslint:disable-next-line:no-console
+  //   console.log(await BitstampService.getInstance().getBalance());
+  //   // tslint:disable-next-line:no-console
+  //   console.log(await CoinbaseService.getInstance().getBalance());
+  //   // tslint:disable-next-line:no-console
+  //   console.log(await KrakenService.getInstance().getBalance());
+  //   // tslint:disable-next-line:no-console
+  //   // console.log(await KrakenService.getInstance().getTradablePairs());
+  // })();
 })

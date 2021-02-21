@@ -13,5 +13,6 @@
 .env.production.local
 
 dev.db
+dev.db*
 
 /dist

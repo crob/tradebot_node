@@ -1,0 +1,41 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// we will want this for prod
+//datasource db {
+//  provider = "postgresql"
+//  url      = env("DATABASE_URL")
+//}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Exchange {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  apiKey    String
+  apiSecret String
+  apiThird  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastSync  DateTime
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int      @unique
+}
+
+model User {
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
+  name      String?
+  password  String
+  salt      String     @default("")
+  exchanges Exchange[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}

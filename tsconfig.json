@@ -6,7 +6,8 @@
     "sourceMap": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "lib": ["es2016", "dom"],
+    "esModuleInterop": true,
+    "lib": ["es2016", "dom", "esnext"],
     "typeRoots": ["./node_modules/@types"]
   },
   "include": ["src/**/*.ts"],
