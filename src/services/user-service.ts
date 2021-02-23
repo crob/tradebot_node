@@ -1,17 +1,10 @@
 import { User } from '@prisma/client';
 import { PrismaService } from './prisma-service';
 import crypto from 'crypto';
+import { Injectable } from '@tsed/di';
 
+@Injectable()
 export class UserService {
-  private static instance: UserService;
-
-  static getInstance() {
-    if (!UserService.instance) {
-      UserService.instance = new UserService();
-    }
-    return UserService.instance;
-  }
-
   async getUsers(): Promise<User[]>  {
     return await PrismaService.getInstance().connection.user.findMany();
   }
@@ -23,6 +16,16 @@ export class UserService {
       }
     });
   }
+
+  // async updateLastLogin(user: User) {
+  //   user.updatedAt = new Date();
+  //   await PrismaService.getInstance().connection.user.update({
+  //     where: {
+  //       email: user.email
+  //     },
+  //     data: user
+  //   });
+  // }
 
   async clearUsers() {
     return await PrismaService.getInstance().connection.user.deleteMany({where: {salt: ""}});

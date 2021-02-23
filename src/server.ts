@@ -1,50 +1,73 @@
-import express from 'express';
-import cors from 'cors';
-import { KrakenService } from './services/exchanges/kraken-service';
-import { CoinbaseService } from './services/exchanges/coinbase-service';
-import { BitstampService } from './services/exchanges/bitstamp.service';
-import router from './controllers/users';
+import { User } from '@prisma/client';
+import {Configuration, Inject, PlatformApplication} from "@tsed/common";
+import bodyParser from "body-parser";
+import compress from "compression";
+import cookieParser from "cookie-parser";
+import methodOverride from "method-override";
+import cookieSession from "cookie-session";
+import { ValidationMessagesMiddleware } from './middlewares/validation-messages-middleware';
 import dotenv from 'dotenv';
-import { PrismaService } from './services/prisma-service';
+import cors from 'cors';
+
 dotenv.config();
+const rootDir = __dirname;
 
-const app = express();
-const port = process.env.PORT || 5000;
+@Configuration({
+  rootDir,
+  port: process.env.PORT || 5000,
+  acceptMimes: ["application/json"],
+  ajv: { options: { allErrors: true } },
+  componentsScan: [
+    `${rootDir}/protocols/*{.ts,.js}`,
+    `${rootDir}/interceptors/*{.ts,.js}`,
+    `${rootDir}/services/*{.ts,.js}`
+  ],
+  mount: {
+    "/api": `${rootDir}/controllers/*.ts`, // using componentScan
+  },
+  passport: {
 
-PrismaService.getInstance().connect();
-
-app.use(cors());
-app.use(express.json());
-
-app.use('/users', router);
-
-const KRAKEN_API_KEY = process.env.KRAKEN_API_KEY;
-const KRAKEN_API_SECRET = process.env.KRAKEN_API_SECRET;
-
-const COINBASE_KEY = process.env.COINBASE_KEY;
-const COINBASE_SECERT = process.env.COINBASE_SECERT;
-const COINBASE_PASSPHRASE = process.env.COINBASE_PASSPHRASE;
-
-const BITSTAMP_KEY = process.env.BITSTAMP_KEY;
-const BITSTAMP_SECRET = process.env.BITSTAMP_SECRET;
-const BITSTAMP_CLIENT_ID = process.env.BITSTAMP_CLIENT_ID;
-
-app.listen(port, () => {
-  // tslint:disable-next-line:no-console
-  console.log(`Server is running: ${port}`);
-
-  // CoinbaseService.getInstance().connect(COINBASE_KEY, COINBASE_SECERT, COINBASE_PASSPHRASE);
-  // KrakenService.getInstance().connect(KRAKEN_API_KEY, KRAKEN_API_SECRET);
-  // BitstampService.getInstance().connect(BITSTAMP_KEY, BITSTAMP_SECRET, BITSTAMP_CLIENT_ID);
-
-  // (async () => {
-  //   // tslint:disable-next-line:no-console
-  //   console.log(await BitstampService.getInstance().getBalance());
-  //   // tslint:disable-next-line:no-console
-  //   console.log(await CoinbaseService.getInstance().getBalance());
-  //   // tslint:disable-next-line:no-console
-  //   console.log(await KrakenService.getInstance().getBalance());
-  //   // tslint:disable-next-line:no-console
-  //   // console.log(await KrakenService.getInstance().getTradablePairs());
-  // })();
+  //   userInfoModel: User
+  }
 })
+export class Server {
+  @Inject()
+  app: PlatformApplication;
+
+  @Configuration()
+  settings: Configuration;
+
+  /**
+   * This method let you configure the express middleware required by your application to works.
+   * @returns {Server}
+   */
+  public $beforeRoutesInit(): void | Promise<any> {
+    this.app
+      .use(cors())
+      .use(cookieParser())
+      .use(compress({}))
+      .use(methodOverride())
+      .use(bodyParser.json())
+      .use(
+        bodyParser.urlencoded({
+          extended: true
+        })
+      )
+      .use(
+        cookieSession({
+          keys: ["mysecretkey"],
+          resave: true,
+          saveUninitialized: true,
+          // maxAge: 36000,
+          maxAge: 24 * 60 * 60 * 1000, // 24 hours
+          cookie: {
+            path: "/",
+            httpOnly: true,
+            secure: false,
+            maxAge: null
+          }
+        })
+      )
+      .use(ValidationMessagesMiddleware);
+    }
+}

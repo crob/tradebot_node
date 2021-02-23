@@ -1,13 +1,23 @@
+import { Exception } from '@tsed/exceptions';
 import { ValidationKeyword } from '../enums';
 
-export class ValidationException {
+export class ValidationException extends Exception {
   static readonly STATUS = 400;
-  json: any;
   constructor(
     dataPath: string,
     keyword: ValidationKeyword,
-    message: string
+    message: string,
+    origin?: Error | string | any
   ) {
-    this.json = { errors: [{ dataPath, message, keyword }] };
+    super(
+      ValidationException.STATUS,
+      JSON.stringify({ errors: [{ dataPath, message, keyword }] }),
+      origin
+    );
   }
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
 }

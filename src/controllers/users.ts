@@ -1,45 +1,52 @@
-import * as express from 'express';
-import { resourceLimits } from 'worker_threads';
 import { UserService } from '../services/user-service';
 import { ValidationException } from '../models/validation-exception';
 import { ValidationKeyword } from '../enums/validation-keyword';
+import { BodyParams, Controller, Get, Post } from '@tsed/common';
+import { Prisma, User } from '@prisma/client';
+import { UserAddView } from '../models/user-add-view';
+import { nameof } from '../utils';
 
-const router = express.Router();
-
-const deletePasswordField = (user) => {
+export const removePasswordField = (user) => {
   delete user.password;
   delete user.salt;
   return user;
 }
 
-router.route('/').get(async(req, res) => {
-  let users = await UserService.getInstance().getUsers()
-  users = users.map(deletePasswordField);
-  res.json(users);
-  return res;
-});
+@Controller("/users")
+export class UserCtl {
+  constructor(private readonly userService: UserService) {}
 
-// just added this temporarily to clear out the users created before the encrypted password
-router.route('/clear').get(async(req, res) => {
-  const users = await UserService.getInstance().clearUsers()
-  res.json(users);
-  return res;
-});
-
-router.route('/add').post(async (req, res) => {
-  const existingUser = await UserService.getInstance().getUserByEmail(req.body.email);
-  if (existingUser) {
-    const exception = new ValidationException('email', ValidationKeyword.emailExists, 'email already exists');
-    res.status(400).json(exception.json);
-    return res;
+  @Get()
+  async getUsers(): Promise<User[]> {
+    let users = await this.userService.getUsers();
+    users = users.map(removePasswordField);
+    return users;
   }
-  const newUser = await UserService.getInstance().createUser(req.body.email, req.body.password).catch((err) => {
-    const exception = new ValidationException(ValidationKeyword.server, ValidationKeyword.server, 'unexpected error. check logs');
-    res.status(400).json(exception.json);
-    return res;
-  })
-  res.json(deletePasswordField(newUser));
-  return res;
-});
 
-export default router;
+  @Get('/clear')
+  async clearUsers(): Promise<Prisma.BatchPayload> {
+    // just added this temporarily to clear out the users created before the encrypted password
+    return await this.userService.clearUsers();
+  }
+
+  @Post("/add")
+  async addUser(@BodyParams() user: UserAddView): Promise<User> {
+    const { email, password } = {...user};
+    const existingUser = await this.userService.getUserByEmail(email);
+    if (existingUser) {
+      throw new ValidationException(
+        nameof<User>("email"),
+        ValidationKeyword.emailExists,
+        "Email already exists"
+      );
+    }
+    const newUser = await this.userService.createUser(email, password).catch((err) => {
+      throw new ValidationException(
+        ValidationKeyword.server,
+        ValidationKeyword.server,
+        'unexpected error. check logs'
+      );
+    });
+    return removePasswordField(newUser);
+  }
+}
