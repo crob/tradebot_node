@@ -33,12 +33,8 @@ export class PassportCtrl {
   @Get("/user")
   @Authorize()
   user(
-    @Req() req: ReqUser,
-    @BodyParams("email") email: string,
-    @BodyParams("password") pass: string
+    @Req() req: ReqUser
   ) {
-    // FACADE
-    // let { id, password, ...rest } = req.user;
     return req.user;
   }
 }
