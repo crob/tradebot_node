@@ -1,32 +1,39 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// we will want this for prod
-//datasource db {
-//  provider = "postgresql"
-//  url      = env("DATABASE_URL")
-//}
-
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
+enum ExchangeSyncStatus {
+  NOT_SYNCED
+  SYNCING
+  SYNCED
+}
+
+enum ExchangeName {
+  COINBASEPRO
+  BITSTAMP
+  KRAKEN
+}
+
 model Exchange {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  apiKey    String
-  apiSecret String
-  apiThird  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  lastSync  DateTime
-  user      User     @relation(fields: [userId], references: [id])
-  userId    Int      @unique
+  id         Int                @id @default(autoincrement())
+  name       ExchangeName       @default(COINBASEPRO)
+  apiKey     String             @unique
+  apiSecret  String             @unique
+  apiThird   String?            @unique
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  lastSync   DateTime?
+  syncStatus ExchangeSyncStatus @default(NOT_SYNCED)
+  user       User               @relation(fields: [userId], references: [id])
+  userId     Int
 }
 
 model User {

@@ -27,7 +27,7 @@ const rootDir = __dirname;
   },
   passport: {
 
-  //   userInfoModel: User
+    // userInfoModel:
   }
 })
 export class Server {

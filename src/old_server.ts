@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import { KrakenService } from './services/exchanges/kraken-service';
-import { CoinbaseService } from './services/exchanges/coinbase-service';
-import { BitstampService } from './services/exchanges/bitstamp.service';
+import { KrakenService } from './services/exchange-apis/kraken-service';
+import { CoinbaseService } from './services/exchange-apis/coinbase-service';
+import { BitstampService } from './services/exchange-apis/bitstamp.service';
 import dotenv from 'dotenv';
 import { PrismaService } from './services/prisma-service';
 dotenv.config();

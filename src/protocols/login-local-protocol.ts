@@ -2,8 +2,8 @@ import { IStrategyOptions, Strategy } from 'passport-local';
 import { OnInstall, OnVerify, Protocol } from '@tsed/passport';
 import { BodyParams, Req } from "@tsed/common";
 import { UserService } from "../services/user-service";
-import { UserAddView } from '../models/user-add-view';
-import { removePasswordField } from '../controllers/users';
+import { UserAddView } from '../models/views/user-add-view';
+import { removePasswordField } from '../controllers/users.strl';
 
 @Protocol<IStrategyOptions>({
   name: "login",

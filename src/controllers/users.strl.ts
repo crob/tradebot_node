@@ -3,7 +3,7 @@ import { ValidationException } from '../models/validation-exception';
 import { ValidationKeyword } from '../enums/validation-keyword';
 import { BodyParams, Controller, Get, Post } from '@tsed/common';
 import { Prisma, User } from '@prisma/client';
-import { UserAddView } from '../models/user-add-view';
+import { UserAddView } from '../models/views/user-add-view';
 import { nameof } from '../utils';
 
 export const removePasswordField = (user) => {
