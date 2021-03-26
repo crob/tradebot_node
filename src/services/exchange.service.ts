@@ -1,13 +1,18 @@
-import { Exchange, ExchangeSyncStatus } from '@prisma/client';
+import { Exchange, ExchangeName, SyncStatus, Transaction } from '@prisma/client';
 import { Injectable } from '@tsed/di';
 import { PrismaService } from './prisma-service';
 import { ExchangeView } from '../models/views/exchange-view';
+import { ExchangeClientFactoryService } from './exchange-apis';
 
 @Injectable()
 export class ExchangeService {
 
+  constructor(private readonly exchangeClientFactoryService: ExchangeClientFactoryService) {
+
+  }
+
   async getExchangeById(id: number): Promise<Exchange> {
-    return PrismaService.getInstance().connection.exchange.findUnique({
+    return await PrismaService.getInstance().connection.exchange.findUnique({
       where: {
         id
       }
@@ -15,7 +20,7 @@ export class ExchangeService {
   }
 
   async getExchangesByUserId(userId: number): Promise<Exchange[]> {
-    return PrismaService.getInstance().connection.exchange.findMany({
+    return await PrismaService.getInstance().connection.exchange.findMany({
       where: {
         userId
       }
@@ -30,11 +35,11 @@ export class ExchangeService {
     });
   }
 
-  async updateExchangeSyncStatus(id: number, syncStatus: ExchangeSyncStatus): Promise<Exchange> {
+  async updateExchangeSyncStatus(id: number, syncStatus: SyncStatus): Promise<Exchange> {
     const data:Partial<Exchange> = {
       syncStatus
     };
-    if (syncStatus === ExchangeSyncStatus.SYNCED) {
+    if (syncStatus === SyncStatus.SYNCED) {
       data.lastSync = new Date();
     }
     return await PrismaService.getInstance().connection.exchange.update({
@@ -43,6 +48,11 @@ export class ExchangeService {
       },
       data
     });
+  }
+
+  async fetchTransactionsForSync(userId: number, exchangeId: number, exchangeName: ExchangeName): Promise<boolean> {
+    const exchangeClient = this.exchangeClientFactoryService.getClientByType(userId, exchangeName);
+    return await exchangeClient.getTransactions(userId, exchangeId);
   }
 
   async isExistingApiKey(userId: number, apiKey: string): Promise<Exchange>  {

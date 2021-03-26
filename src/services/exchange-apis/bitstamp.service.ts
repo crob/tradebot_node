@@ -1,24 +1,16 @@
-import { BaseExchangeApi } from '../../models';
 import { BaseExchangeClient } from './base-exchange-service';
 import { Bitstamp } from 'node-bitstamp'
 import { AccountBalance } from '../../models/account-balance';
-import { ExchangeType } from '../../enums/exchange-type';
+import { ExchangeName } from '@prisma/client';
+import { TaskQueueService } from '../task-queue.service';
 
-export class BitstampService extends BaseExchangeClient implements BaseExchangeApi {
-  private static instance: BitstampService;
-  type = ExchangeType.BitStamp;
+export class BitstampService extends BaseExchangeClient {
+  type = ExchangeName.BITSTAMP;
   client: Bitstamp;
   useSandbox = false;
 
-  constructor() {
-    super();
-  }
-
-  static getInstance() {
-    if (!BitstampService.instance) {
-      BitstampService.instance = new BitstampService();
-    }
-    return BitstampService.instance;
+  constructor(protected taskQueueService: TaskQueueService) {
+    super(taskQueueService);
   }
 
   connect(key: string, secret: string, passphrase: string, useSandbox = false) {
@@ -49,6 +41,10 @@ export class BitstampService extends BaseExchangeClient implements BaseExchangeA
     // return this.getClient().api('AssetPairs')
   }
 
+  getTransactions(userId: number, exchangeId: number) {
+    return null;
+  }
+
   setTrade() {
     return null;
     // return this.getClient().api('AssetPairs')
@@ -73,5 +69,9 @@ export class BitstampService extends BaseExchangeClient implements BaseExchangeA
       throw new Error(e);
     }
     return [];
+  }
+
+  disconnect() {
+    return null;
   }
 }

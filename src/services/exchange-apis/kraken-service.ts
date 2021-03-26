@@ -1,24 +1,16 @@
-import { BaseExchangeApi } from '../../models';
 import * as KrakenClient from 'kraken-api';
 import { BaseExchangeClient } from './base-exchange-service';
-import { ExchangeType } from '../../enums/exchange-type';
 import { KrakenApi } from '../../enums';
 import { AccountBalance } from '../../models/account-balance';
+import { ExchangeName } from '@prisma/client';
+import { TaskQueueService } from '../task-queue.service';
 
-export class KrakenService extends BaseExchangeClient implements BaseExchangeApi {
-  private static instance: KrakenService;
+export class KrakenService extends BaseExchangeClient {
   client: KrakenClient;
-  type = ExchangeType.Kraken;
+  type = ExchangeName.KRAKEN
 
-  constructor() {
-    super();
-  }
-
-  static getInstance() {
-    if (!KrakenService.instance) {
-      KrakenService.instance = new KrakenService();
-    }
-    return KrakenService.instance;
+  constructor(protected taskQueueService: TaskQueueService) {
+    super(taskQueueService);
   }
 
   connect(key: string, secret: string) {
@@ -44,6 +36,10 @@ export class KrakenService extends BaseExchangeClient implements BaseExchangeApi
     return this.getClient().api(KrakenApi.AssetPairs)
   }
 
+  async getTransactions(userId: number, exchangeId: number) {
+    return null;
+  }
+
   async getBalance(): Promise<AccountBalance[]> {
     const accounts = [];
     try {
@@ -65,5 +61,9 @@ export class KrakenService extends BaseExchangeClient implements BaseExchangeApi
       throw new Error(e);
     }
     return accounts;
+  }
+
+  disconnect() {
+    return null;
   }
 }

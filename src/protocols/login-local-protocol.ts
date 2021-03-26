@@ -3,7 +3,7 @@ import { OnInstall, OnVerify, Protocol } from '@tsed/passport';
 import { BodyParams, Req } from "@tsed/common";
 import { UserService } from "../services/user-service";
 import { UserAddView } from '../models/views/user-add-view';
-import { removePasswordField } from '../controllers/users.strl';
+import { removePasswordField } from '../controllers/users.ctrl';
 
 @Protocol<IStrategyOptions>({
   name: "login",

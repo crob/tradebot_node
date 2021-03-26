@@ -8,6 +8,7 @@ import cookieSession from "cookie-session";
 import { ValidationMessagesMiddleware } from './middlewares/validation-messages-middleware';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import { TaskQueueService } from './services/task-queue.service';
 
 dotenv.config();
 const rootDir = __dirname;
@@ -31,6 +32,9 @@ const rootDir = __dirname;
   }
 })
 export class Server {
+
+  constructor(private taskQueueService: TaskQueueService) {}
+
   @Inject()
   app: PlatformApplication;
 
@@ -69,5 +73,14 @@ export class Server {
         })
       )
       .use(ValidationMessagesMiddleware);
+
+      this.taskQueueService.init({
+        removeOnSuccess: true,
+        redis: {
+          host: process.env.REDIS_DB_HOST,
+          port: process.env.REDIS_DB_PORT,
+          password: process.env.REDIS_DB_PASS
+        }
+      })
     }
 }
