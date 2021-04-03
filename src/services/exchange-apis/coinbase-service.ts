@@ -1,5 +1,5 @@
 import { BaseExchangeClient } from './base-exchange-service';
-import CoinbasePro, { Account, AccountHistory, FilledOrder, Order, Pagination, OrderType as CBOrderType } from 'coinbase-pro-node';
+import CoinbasePro, { Account, AccountHistory, FilledOrder, Order, Pagination, OrderType as CBOrderType, WebSocketChannelName, WebSocketEvent } from 'coinbase-pro-node';
 import { AccountBalance } from '../../models/account-balance';
 import { ExchangeName, OrderType, SideType, Transaction } from '@prisma/client';
 import { TaskQueueService } from '../task-queue.service';
@@ -7,6 +7,7 @@ import { TaskType } from '../../enums/task-type';
 import { FinishExchangeSyncCallback } from 'trade_bot';
 import { OrderSide as CBOrderSide } from 'coinbase-pro-node';
 import { $log } from '@tsed/common';
+import { UserSocketService } from '../../sockets/user-socket.service';
 
 export class CoinbaseService extends BaseExchangeClient {
   type = ExchangeName.COINBASEPRO;
@@ -15,19 +16,11 @@ export class CoinbaseService extends BaseExchangeClient {
 
 
   constructor(
-    protected taskQueueService: TaskQueueService
+    protected taskQueueService: TaskQueueService,
+    // private userSocketService: UserSocketService
   ) {
     super(taskQueueService);
   }
-
-  // get client(): CoinbasePro {
-  //   return new CoinbasePro({
-  //     apiKey: this.key,
-  //     apiSecret: this.secret,
-  //     passphrase: this.passphrase,
-  //     useSandbox: this.useSandbox
-  //   });
-  // }
 
   connect(key: string, secret: string, passphrase: string, useSandbox = false) {
     this.key = key;
@@ -67,8 +60,6 @@ export class CoinbaseService extends BaseExchangeClient {
     }
     return this.isSyncing;
   }
-
-
 
   queueSyncAccountHistory(account: Account) {
     const newJob = this.taskQueueService.createTask((TaskType.SyncCoinbaseAccount + this.exchangeId) as TaskType, async (job, done) => {
@@ -175,7 +166,6 @@ export class CoinbaseService extends BaseExchangeClient {
           this.syncedTransactions.push(transaction as Transaction);
           // $log.info("transaction", transaction, order)
         } else {
-          // tslint:disable-next-line:no-console
           $log.info("not filled", order)
         }
       } catch(err) {
@@ -222,6 +212,45 @@ export class CoinbaseService extends BaseExchangeClient {
       throw new Error(e);
     }
     return [];
+  }
+
+  connectToSocket(pairs: string[]) {
+    const channel = {
+      name: WebSocketChannelName.TICKER,
+      product_ids: pairs.map(pair => `${pair}-USD`),
+    };
+
+    // 3. Wait for open WebSocket to send messages
+    this.client.ws.on(WebSocketEvent.ON_OPEN, () => {
+      // 7. Subscribe to WebSocket channel
+      this.client.ws.subscribe([channel]);
+    });
+
+    // 4. Listen to WebSocket subscription updates
+    this.client.ws.on(WebSocketEvent.ON_SUBSCRIPTION_UPDATE, subscriptions => {
+      // When there are no more subscriptions...
+      if (subscriptions.channels.length === 0) {
+        // 10. Disconnect WebSocket (and end program)
+        this.client.ws.disconnect();
+      }
+    });
+
+    // 5. Listen to WebSocket channel updates
+    this.client.ws.on(WebSocketEvent.ON_MESSAGE_TICKER, tickerMessage => {
+      // 8. Receive message from WebSocket channel
+      $log.info(`Received message of type "${tickerMessage.type}".`, tickerMessage);
+      // 9. Unsubscribe from WebSocket channel
+      this.client.ws.unsubscribe([
+        {
+          name: WebSocketChannelName.TICKER,
+          product_ids: [tickerMessage.product_id],
+        },
+      ]);
+    });
+
+    // 6. Connect to WebSocket
+    this.client.ws.connect({debug: true});
+
   }
 
   disconnect() {
