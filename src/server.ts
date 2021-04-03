@@ -1,14 +1,17 @@
-import { User } from '@prisma/client';
 import {Configuration, Inject, PlatformApplication} from "@tsed/common";
+import "@tsed/socketio";
 import bodyParser from "body-parser";
 import compress from "compression";
 import cookieParser from "cookie-parser";
 import methodOverride from "method-override";
 import cookieSession from "cookie-session";
-import { ValidationMessagesMiddleware } from './middlewares/validation-messages-middleware';
 import dotenv from 'dotenv';
 import cors from 'cors';
+
+
+import { ValidationMessagesMiddleware } from './middlewares/validation-messages-middleware';
 import { TaskQueueService } from './services/task-queue.service';
+import { ServerOptions } from 'socket.io';
 
 dotenv.config();
 const rootDir = __dirname;
@@ -27,9 +30,15 @@ const rootDir = __dirname;
     "/api": `${rootDir}/controllers/*.ts`, // using componentScan
   },
   passport: {
-
     // userInfoModel:
-  }
+  },
+  socketIO: {
+    cors: {
+      origin: "http://localhost:3000",
+      methods: ["GET", "POST"],
+    }
+    // path: '/socket'
+  } as ServerOptions
 })
 export class Server {
 

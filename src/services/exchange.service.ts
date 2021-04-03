@@ -1,15 +1,11 @@
-import { Exchange, ExchangeName, SyncStatus, Transaction } from '@prisma/client';
+import { Exchange, SyncStatus } from '@prisma/client';
 import { Injectable } from '@tsed/di';
 import { PrismaService } from './prisma-service';
 import { ExchangeView } from '../models/views/exchange-view';
-import { ExchangeClientFactoryService } from './exchange-apis';
+import { ExchangeWithTransactions } from '../models/exchange-with-transactions';
 
 @Injectable()
 export class ExchangeService {
-
-  constructor(private readonly exchangeClientFactoryService: ExchangeClientFactoryService) {
-
-  }
 
   async getExchangeById(id: number): Promise<Exchange> {
     return await PrismaService.getInstance().connection.exchange.findUnique({
@@ -19,18 +15,37 @@ export class ExchangeService {
     });
   }
 
-  async getExchangesByUserId(userId: number): Promise<Exchange[]> {
+  async getExchangesByUserId(userId: number, includeTransactions = false): Promise<ExchangeWithTransactions[]> {
     return await PrismaService.getInstance().connection.exchange.findMany({
       where: {
         userId
+      },
+      include: {
+        transactions: includeTransactions
       }
     });
   }
 
   async removeExchange(id: number): Promise<Exchange> {
+    await PrismaService.getInstance().connection.transaction.deleteMany({
+      where: {
+        exchangeId: id
+      }
+    });
     return await PrismaService.getInstance().connection.exchange.delete({
       where: {
         id
+      }
+    });
+  }
+
+  async setAllUserExchangesToSyncing(userId: number) {
+    return await PrismaService.getInstance().connection.exchange.updateMany({
+      where: {
+        userId
+      },
+      data: {
+        syncStatus: SyncStatus.SYNCING
       }
     });
   }
@@ -40,7 +55,7 @@ export class ExchangeService {
       syncStatus
     };
     if (syncStatus === SyncStatus.SYNCED) {
-      data.lastSync = new Date();
+      data.lastSyncAt = new Date();
     }
     return await PrismaService.getInstance().connection.exchange.update({
       where: {
@@ -48,11 +63,6 @@ export class ExchangeService {
       },
       data
     });
-  }
-
-  async fetchTransactionsForSync(userId: number, exchangeId: number, exchangeName: ExchangeName): Promise<boolean> {
-    const exchangeClient = this.exchangeClientFactoryService.getClientByType(userId, exchangeName);
-    return await exchangeClient.getTransactions(userId, exchangeId);
   }
 
   async isExistingApiKey(userId: number, apiKey: string): Promise<Exchange>  {

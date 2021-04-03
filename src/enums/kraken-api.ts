@@ -1,4 +1,6 @@
 export enum KrakenApi {
   Balance = 'Balance',
-  AssetPairs = 'AssetPairs'
+  AssetPairs = 'AssetPairs',
+  TradesHistory = 'TradesHistory',
+  Ledgers = 'Ledgers'
 }

@@ -1,5 +1,5 @@
-import { Exchange, Prisma } from '@prisma/client';
-import { BodyParams, Controller, Delete, Get, Post, Req } from '@tsed/common';
+import { Exchange, Prisma, Transaction } from '@prisma/client';
+import { $log, BodyParams, Controller, Delete, Get, PathParams, Post, Req } from '@tsed/common';
 import { ExchangeService } from '../services/exchange.service';
 import { ExchangeView } from '../models/views/exchange-view';
 import { ReqUser } from '../models/req-user';
@@ -7,10 +7,18 @@ import { Authorize } from '@tsed/passport';
 import { ValidationException } from '../models/validation-exception';
 import { nameof } from '../utils';
 import { ValidationKeyword } from '../enums';
+import { TransactionService } from '../services/transaction.service';
+import { SyncService } from '../services/sync.service';
+import { ExchangeClientFactoryService } from '../services/exchange-apis';
 
 @Controller("/exchanges")
 export class UserCtl {
-  constructor(private readonly exchangeService: ExchangeService) {}
+  constructor(
+    private readonly exchangeService: ExchangeService,
+    private readonly syncService: SyncService,
+    private readonly exchangeClientFactoryService: ExchangeClientFactoryService,
+    private transactionService: TransactionService
+  ) {}
 
   @Authorize()
   @Get()
@@ -20,6 +28,17 @@ export class UserCtl {
     const exchanges = await this.exchangeService.getExchangesByUserId(parseInt(req.user.id, 10));
     // users = users.map(removePasswordField);
     return exchanges;
+  }
+
+  @Authorize()
+  @Get('/:id/transactions')
+  async getExchangeTransactions(
+    @Req() req: ReqUser,
+    @PathParams("id") exchangeId: number,
+  ): Promise<Transaction[]> {
+    const transactions = await this.transactionService.getByExchangeId(exchangeId);
+    // users = users.map(removePasswordField);
+    return transactions;
   }
 
   @Authorize()
@@ -33,6 +52,7 @@ export class UserCtl {
       await this.exchangeService.removeExchange(ex.id);
       count++;
     })
+    this.syncService.forcePortfolioSync(parseInt(req.user.id, 10));
     // just added this temporarily to clear out the exchanges during testing
     return count;
   }
@@ -57,7 +77,7 @@ export class UserCtl {
     const newExchange = await this.exchangeService.createExchange(exchange)
       .catch((err) => {
         // tslint:disable-next-line:no-console
-        console.log("err", err)
+        $log.error("err", err)
 
         throw new ValidationException(
           ValidationKeyword.server,
@@ -65,6 +85,8 @@ export class UserCtl {
           'unexpected error. check logs'
         );
       });
+    this.exchangeClientFactoryService.addClientToUser(newExchange.userId, newExchange);
+    this.syncService.forcePortfolioSync(exchange.userId);
     return newExchange;
   }
 }

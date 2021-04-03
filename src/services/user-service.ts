@@ -5,6 +5,7 @@ import { Injectable } from '@tsed/di';
 
 @Injectable()
 export class UserService {
+
   async getUsers(): Promise<User[]>  {
     return await PrismaService.getInstance().connection.user.findMany();
   }

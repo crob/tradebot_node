@@ -44,6 +44,7 @@ export class PassportCtrl {
   user(
     @Req() req: ReqUser
   ) {
+
     return req.user;
   }
 }

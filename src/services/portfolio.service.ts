@@ -1,22 +1,13 @@
 import { Injectable } from '@tsed/di';
-import { ExchangeService } from './exchange.service';
 import { PrismaService } from './prisma-service';
-import { TaskQueueService } from './task-queue.service';
-import { TaskType } from '../enums/task-type';
 import { SyncStatus } from '../enums/sync-status';
 import { Portfolio } from '@prisma/client';
+import { PortfolioWithAssets } from '../models/portfolio-with-assets';
 
 @Injectable()
 export class PortfolioService {
 
-  constructor(
-    private exchangeService: ExchangeService,
-    private taskQueueService: TaskQueueService
-  ) {
-
-  }
-
-  async getOrCreatePortfolio(userId: number): Promise<Portfolio> {
+  async getOrCreatePortfolio(userId: number): Promise<PortfolioWithAssets> {
     const portfolio = await this.getByUserId(userId);
 
     if (!portfolio) {
@@ -25,84 +16,65 @@ export class PortfolioService {
     return portfolio;
   }
 
-  async createPortfolio(userId: number): Promise<Portfolio> {
+  async createPortfolio(userId: number): Promise<PortfolioWithAssets> {
     const portfolio = await PrismaService.getInstance().connection.portfolio.create({
       data: {
         userId
       }
     });
-    this.queueSyncPortfolio(portfolio.id);
     return portfolio;
   }
 
-  async getAll(): Promise<Portfolio[]>  {
+  async getAll(): Promise<PortfolioWithAssets[]>  {
     return await PrismaService.getInstance().connection.portfolio.findMany();
   }
 
-  async getByUserId(userId: number): Promise<Portfolio> {
+  async getByUserId(userId: number, includeAssets = true): Promise<Portfolio> {
     return await PrismaService.getInstance().connection.portfolio.findFirst({
       where: {
         userId
+      },
+      include: {
+        portfolioAssets: includeAssets
       }
     });
   }
 
-  async getById(id: number): Promise<Portfolio> {
+  async getById(id: number, includeAssets = true): Promise<PortfolioWithAssets> {
     return await PrismaService.getInstance().connection.portfolio.findUnique({
       where: {
         id
+      },
+      include: {
+        portfolioAssets: includeAssets
       }
     });
   }
 
-  async forceSync(userId: number): Promise<Portfolio> {
-    const portfolio = await this.getByUserId(userId);
-    this.queueSyncPortfolio(portfolio.id);
-    return portfolio;
-  }
-
-  queueSyncPortfolio(portfolioId: number) {
-    const newJob = this.taskQueueService.createTask(TaskType.SyncPortfolio, async (job, done) => {
-      try {
-        await this.syncPortfolio(job.data.portfolioId);
-      } catch(err) {
-        done(err);
-        return;
-      }
-      done();
-    });
-    this.taskQueueService.runJob(newJob, { portfolioId });
-  }
-
-  async updateSyncStatus(portfolioId: number, syncStatus: SyncStatus): Promise<Portfolio> {
+  async updateSyncStatus(portfolioId: number, syncStatus: SyncStatus, includeAssets = false): Promise<PortfolioWithAssets> {
     const data = {
       syncStatus
     } as any;
     if (syncStatus === SyncStatus.SYNCED) {
-      data.lastSync = new Date();
+      data.lastSyncAt = new Date();
     }
     return await PrismaService.getInstance().connection.portfolio.update({
       where: {
         id: portfolioId
       },
-      data
+      data,
+      include: {
+        portfolioAssets: includeAssets
+      }
     });
   }
 
-  async syncPortfolio(portfolioId: number): Promise<Portfolio> {
-    await this.updateSyncStatus(portfolioId, SyncStatus.SYNCING);
-
-    const portfolio = await this.getById(portfolioId);
-
-    const exchanges = await this.exchangeService.getExchangesByUserId(portfolio.userId);
-
-    exchanges.forEach(async (exchange) => await this.exchangeService.fetchTransactionsForSync(portfolio.userId, exchange.id, exchange.name));
-
-    await this.updateSyncStatus(portfolioId, SyncStatus.SYNCED);
-    return portfolio;
-  }
-
   async removePortfolio(id: number): Promise<Portfolio> {
+    await PrismaService.getInstance().connection.portfolioAsset.deleteMany({
+      where: {
+        portfolioId: id
+      }
+    });
     return await PrismaService.getInstance().connection.portfolio.delete({
       where: {
         id

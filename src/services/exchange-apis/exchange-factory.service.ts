@@ -13,11 +13,17 @@ export class ExchangeClientFactoryService {
   users: {[userId: number]: BaseExchangeClient[] } = {};
 
   getClientByType(userId: number, exchangeName: ExchangeName): BaseExchangeClient {
-    return this.users[userId].find((service: BaseExchangeClient) => service.type === exchangeName);
+    return this.users[userId]?.find((service: BaseExchangeClient) => service.type === exchangeName);
   }
 
-  getClientById(userId: number, exchangeId: number): BaseExchangeClient {
-    return this.users[userId].find((service: BaseExchangeClient) => service.exchangeId === exchangeId);
+  getClientById(userId: number, exchange: Exchange): BaseExchangeClient {
+    let exchangeClient = this.users[userId]?.find((service: BaseExchangeClient) => service.exchangeId === exchange.id);
+    if (!exchangeClient) {
+      exchangeClient = this.getClient(exchange);
+      this.users[userId] = this.users[userId] || [];
+      this.users[userId].push(exchangeClient);
+    }
+    return exchangeClient;
   }
 
   createClients(userId, exchanges: Exchange[]) {
@@ -48,7 +54,7 @@ export class ExchangeClientFactoryService {
   }
 
   addClientToUser(userId, exchange: Exchange) {
-    const existingExchange = this.getClientById(userId, exchange.id);
+    const existingExchange = this.getClientById(userId, exchange);
 
     if (existingExchange) {
       const indexOf = this.users[userId].indexOf(existingExchange);

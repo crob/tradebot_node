@@ -8,6 +8,9 @@
     "emitDecoratorMetadata": true,
     "esModuleInterop": true,
     "lib": ["es2016", "dom", "esnext"],
+    "paths": {
+      "trade_bot": ["./typings"]
+    },
     "typeRoots": ["./node_modules/@types"]
   },
   "include": ["src/**/*.ts"],

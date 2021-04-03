@@ -6,6 +6,6 @@ export interface ExchangeView {
   apiKey: string;
   apiSecret: string;
   apiThird?: string | null;
-  lastSync: Date;
+  lastSyncAt: Date;
   userId: number;
 }

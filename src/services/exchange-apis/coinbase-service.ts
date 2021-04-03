@@ -1,31 +1,33 @@
 import { BaseExchangeClient } from './base-exchange-service';
-import CoinbasePro, { Account, AccountHistory, AccountHistoryDetails, FilledOrder, Order, Pagination } from 'coinbase-pro-node';
+import CoinbasePro, { Account, AccountHistory, FilledOrder, Order, Pagination, OrderType as CBOrderType } from 'coinbase-pro-node';
 import { AccountBalance } from '../../models/account-balance';
-import { ExchangeName, OrderType, Transaction } from '@prisma/client';
+import { ExchangeName, OrderType, SideType, Transaction } from '@prisma/client';
 import { TaskQueueService } from '../task-queue.service';
 import { TaskType } from '../../enums/task-type';
+import { FinishExchangeSyncCallback } from 'trade_bot';
+import { OrderSide as CBOrderSide } from 'coinbase-pro-node';
+import { $log } from '@tsed/common';
 
 export class CoinbaseService extends BaseExchangeClient {
   type = ExchangeName.COINBASEPRO;
   client: CoinbasePro;
   useSandbox = false;
 
-  exchangeId: number;
-  userId: number;
-
-  isSyncing = false;
-  stop = false;
-  accountsToSync: Account[];
-  accountsWithHistory: {
-    [currency: string]: AccountHistory[]
-  } = {};
-  syncedTransactions: Transaction[] = [];
 
   constructor(
     protected taskQueueService: TaskQueueService
   ) {
     super(taskQueueService);
   }
+
+  // get client(): CoinbasePro {
+  //   return new CoinbasePro({
+  //     apiKey: this.key,
+  //     apiSecret: this.secret,
+  //     passphrase: this.passphrase,
+  //     useSandbox: this.useSandbox
+  //   });
+  // }
 
   connect(key: string, secret: string, passphrase: string, useSandbox = false) {
     this.key = key;
@@ -53,26 +55,34 @@ export class CoinbaseService extends BaseExchangeClient {
     return this.getClient().api('AssetPairs')
   }
 
-  async getTransactions(userId: number, exchangeId: number): Promise<boolean> {
+  async getTransactions(userId: number, exchangeId: number, finishSyncCallback: FinishExchangeSyncCallback): Promise<boolean> {
     if (!this.isSyncing) {
+      this.isSyncing = true;
       this.userId = userId;
       this.exchangeId = exchangeId;
-      this.isSyncing = true;
+      this.resetSyncData();
+      this.finishSyncCallback = finishSyncCallback;
       this.accountsToSync = await this.client.rest.account.listAccounts();
       this.queueSyncAccountHistory(this.accountsToSync.pop());
     }
     return this.isSyncing;
   }
 
+
+
   queueSyncAccountHistory(account: Account) {
-    const newJob = this.taskQueueService.createTask(TaskType.SyncCoinbaseAccount, async (job, done) => {
+    const newJob = this.taskQueueService.createTask((TaskType.SyncCoinbaseAccount + this.exchangeId) as TaskType, async (job, done) => {
       try {
-        const historyItems = await this.fetchAccountHistoryRecursive(job.data.accountId);
-        if (historyItems.length > 0 && this.stop === false) {
-          this.stop = true;
-          this.accountsWithHistory[job.data.currency] = historyItems;
-        }
+        let historyItems = await this.fetchAccountHistoryRecursive(job.data.accountId);
+        // filter out anything that isnt an order
+        historyItems = historyItems.filter(item => item.details.order_id);
+        historyItems.map(item => item.details.order_id).forEach((orderId) => {
+          if (!this.ordersToFetch.includes(orderId)) {
+            this.ordersToFetch.push(orderId);
+          }
+        });
       } catch(err) {
+        $log.error("some error happeend", err)
         done(err);
         return;
       }
@@ -82,15 +92,31 @@ export class CoinbaseService extends BaseExchangeClient {
     this.taskQueueService.runJob(newJob, { accountId: account.id, currency: account.currency });
 
     newJob.on('succeeded', (job) => {
-      // when the history has been fetched pop the next account off the stack
-      if (this.accountsToSync.length > 0) {
-        this.queueSyncAccountHistory(this.accountsToSync.pop());
-      }
-      // console.log(job.data.currency)
-      if (this.accountsWithHistory[job.data.currency]) {
-        this.queueSyncAccountHistoryDetails(job.data.currency, this.accountsWithHistory[job.data.currency].pop());
-      }
+      this.nextAccount();
     });
+
+    newJob.on('error', (job) => {
+      this.nextAccount();
+    });
+  }
+
+  nextAccount() {
+    // when the history has been fetched pop the next account off the stack
+    if (this.accountsToSync.length > 0) {
+      this.queueSyncAccountHistory(this.accountsToSync.pop());
+    } else {
+      this.nextOrderToFetchOrFinish();
+    }
+  }
+
+  nextOrderToFetchOrFinish() {
+    if (this.ordersToFetch?.length > 0) {
+      const orderId = this.ordersToFetch.pop();
+      $log.info("getting order", orderId)
+      this.queueSyncAccountHistoryDetails(orderId);
+    } else {
+      this.finishSync();
+    }
   }
 
   async fetchAccountHistoryRecursive(accountId: string, prevHistory?: AccountHistory[], pagination?: Pagination): Promise<AccountHistory[]> {
@@ -114,8 +140,8 @@ export class CoinbaseService extends BaseExchangeClient {
     }
   }
 
-  queueSyncAccountHistoryDetails(currency, accountHistory: AccountHistory) {
-    const newJob = this.taskQueueService.createTask(TaskType.SyncCoinbaseAccountHistoryDetails, async (job, done) => {
+  queueSyncAccountHistoryDetails(orderId: string) {
+    const newJob = this.taskQueueService.createTask((TaskType.SyncCoinbaseAccountHistoryDetails + this.exchangeId) as TaskType, async (job, done) => {
       try {
         const order = await this.fetchAccountHistoryDetails(job.data.orderId);
 
@@ -125,13 +151,16 @@ export class CoinbaseService extends BaseExchangeClient {
             fill_fees,
             settled,
             created_at,
+            side,
             filled_size,
+            product_id,
             done_at
           } = order as FilledOrder;
-
+          const [coin, fiat] = product_id.split('-');
           const transaction:Partial<Transaction> = {};
-          transaction.type = (order.type === 'limit') ? OrderType.LIMIT : OrderType.MARKET;
-          transaction.coin = currency;
+          transaction.type = (order.type === CBOrderType.LIMIT) ? OrderType.LIMIT : OrderType.MARKET;
+          transaction.coin = coin;
+          transaction.coinName = fiat;
           transaction.settled = settled;
           transaction.openedAt = new Date(created_at);
           transaction.doneAt = new Date(done_at);
@@ -141,34 +170,33 @@ export class CoinbaseService extends BaseExchangeClient {
           transaction.fees = parseFloat(fill_fees);
           transaction.purchasePrice = parseFloat(order.executed_value) / parseFloat(filled_size);
           transaction.amount = parseFloat(filled_size);
+          transaction.side = (side === CBOrderSide.BUY) ? SideType.BUY : SideType.SELL;
+
           this.syncedTransactions.push(transaction as Transaction);
-          // console.log("transaction", transaction, order)
+          // $log.info("transaction", transaction, order)
         } else {
           // tslint:disable-next-line:no-console
-          console.log("not filled", order)
+          $log.info("not filled", order)
         }
-        // if (historyItems.length > 0) {
-        //   this.accountsWithHistory[job.data.currency] = historyItems;
-        // }
       } catch(err) {
+        $log.info("error fetching order", job.data.orderId)
         done(err);
         return;
       }
       done();
     });
 
-    this.taskQueueService.runJob(newJob, { orderId: accountHistory.details.order_id, currency });
+    this.taskQueueService.runJob(newJob, { orderId });
 
     newJob.on('succeeded', (job) => {
-      // when the history has been fetched pop the next account off the stack
-      if (this.accountsWithHistory[job.data.currency]?.length > 0) {
-        this.queueSyncAccountHistoryDetails(job.data.currency, this.accountsWithHistory[job.data.currency].pop());
-      } else {
-        // tslint:disable-next-line:no-console
-        console.log(`${job.data.currency} has finished fetching orders`)
-      }
+      this.nextOrderToFetchOrFinish();
+    });
+
+    newJob.on('error', (job) => {
+      this.nextOrderToFetchOrFinish();
     });
   }
+
 
   async fetchAccountHistoryDetails(orderId): Promise<Order> {
     return await this.client.rest.order.getOrder(orderId);
@@ -183,7 +211,7 @@ export class CoinbaseService extends BaseExchangeClient {
       const accounts = await this.client.rest.account.listAccounts();
       if (accounts) {
         return accounts.filter(acct => parseFloat(acct.balance) > 0).map((acct) => {
-          // console.log("acct", acct)
+          // $log.info("acct", acct)
           return {
             ticker: acct.currency,
             balance: parseFloat(acct.balance),
