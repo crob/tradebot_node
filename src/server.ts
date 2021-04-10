@@ -34,7 +34,7 @@ const rootDir = __dirname;
   },
   socketIO: {
     cors: {
-      origin: "http://localhost:3000",
+      origin: "*",
       methods: ["GET", "POST"],
     }
     // path: '/socket'
@@ -56,7 +56,9 @@ export class Server {
    */
   public $beforeRoutesInit(): void | Promise<any> {
     this.app
-      .use(cors())
+      .use(cors( {
+        origin: "*"
+      }))
       .use(cookieParser())
       .use(compress({}))
       .use(methodOverride())

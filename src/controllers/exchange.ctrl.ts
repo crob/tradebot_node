@@ -12,7 +12,7 @@ import { SyncService } from '../services/sync.service';
 import { ExchangeClientFactoryService } from '../services/exchange-apis';
 
 @Controller("/exchanges")
-export class UserCtl {
+export class ExchangeCtl {
   constructor(
     private readonly exchangeService: ExchangeService,
     private readonly syncService: SyncService,
@@ -25,9 +25,7 @@ export class UserCtl {
   async getExchanges(
     @Req() req: ReqUser
   ): Promise<Exchange[]> {
-    const exchanges = await this.exchangeService.getExchangesByUserId(parseInt(req.user.id, 10));
-    // users = users.map(removePasswordField);
-    return exchanges;
+    return await this.exchangeService.getExchangesViewModelByUserId(parseInt(req.user.id, 10));
   }
 
   @Authorize()
@@ -87,6 +85,6 @@ export class UserCtl {
       });
     this.exchangeClientFactoryService.addClientToUser(newExchange.userId, newExchange);
     this.syncService.forcePortfolioSync(exchange.userId);
-    return newExchange;
+    return this.exchangeService.removeSensativeExchangeInfo(newExchange);
   }
 }

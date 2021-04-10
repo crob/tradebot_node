@@ -11,7 +11,7 @@ export abstract class BaseExchangeClient {
   abstract get client(): any;
   isUp = false;
   type: ExchangeName;
-
+  lastOffset: number;
   exchangeId: number;
   userId: number;
 
@@ -24,7 +24,7 @@ export abstract class BaseExchangeClient {
   protected abstract handleConnection();
   abstract getBalance(): Promise<any>;
   abstract getTradablePairs(): Promise<any>;
-  abstract getTransactions(userId: number, exchangeId: number, callback: FinishExchangeSyncCallback): Promise<any>;
+  abstract getTransactions(userId: number, exchangeId: number, lastOffset:number, callback: FinishExchangeSyncCallback): Promise<any>;
   abstract setTrade(): Promise<any>;
   abstract disconnect();
 
@@ -44,7 +44,7 @@ export abstract class BaseExchangeClient {
   finishSync() {
     if (this.isSyncing) {
       this.isSyncing = false;
-      this.finishSyncCallback(this.userId, this.exchangeId, this.syncedTransactions);
+      this.finishSyncCallback(this.userId, this.exchangeId, this.syncedTransactions, this.lastOffset);
     }
   }
 

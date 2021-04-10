@@ -42,7 +42,7 @@ export class BitstampService extends BaseExchangeClient {
     return null;
   }
 
-  async getTransactions(userId: number, exchangeId: number, finishSyncCallback: FinishExchangeSyncCallback): Promise<boolean>  {
+  async getTransactions(userId: number, exchangeId: number, lastOffset: number = null, finishSyncCallback: FinishExchangeSyncCallback): Promise<boolean>  {
     if (!this.isSyncing) {
       this.isSyncing = true;
       this.userId = userId;

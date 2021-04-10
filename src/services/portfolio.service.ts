@@ -46,7 +46,7 @@ export class PortfolioService {
         id
       },
       include: {
-        portfolioAssets: includeAssets
+        portfolioAssets: includeAssets,
       }
     });
   }

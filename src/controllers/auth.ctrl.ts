@@ -29,7 +29,7 @@ export class PassportCtrl {
   ) {
     // FACADE
     const id = parseInt(req.user.id, 10);
-    const exchanges = await this.exchangeService.getExchangesByUserId(id)
+    const exchanges = await this.exchangeService.getExchangesByUserId(id);
     this.exchangeClientFactoryService.createClients(id, exchanges);
     return req.user;
   }

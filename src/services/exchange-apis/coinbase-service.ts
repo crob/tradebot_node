@@ -48,7 +48,7 @@ export class CoinbaseService extends BaseExchangeClient {
     return this.getClient().api('AssetPairs')
   }
 
-  async getTransactions(userId: number, exchangeId: number, finishSyncCallback: FinishExchangeSyncCallback): Promise<boolean> {
+  async getTransactions(userId: number, exchangeId: number, lastOffset: number = null, finishSyncCallback: FinishExchangeSyncCallback): Promise<boolean> {
     if (!this.isSyncing) {
       this.isSyncing = true;
       this.userId = userId;

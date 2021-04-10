@@ -59,12 +59,20 @@ export class PortfolioCtrl {
   }
 
   @Authorize()
+  @Get('/processPortfolio')
+  async processPortfolio(
+    @Req() req: ReqUser
+  ): Promise<PortfolioWithAssets> {
+    return await this.syncService.processPortfolio(parseInt(req.user.id, 10));
+  }
+
+  @Authorize()
   @Delete()
   async deleteExchanges(
     @Req() req: ReqUser
   ): Promise<Portfolio> {
     const porfolio = await this.portfolioService.getByUserId(parseInt(req.user.id, 10));
-
+    await this.portfolioAssetService.deleteByPortfolioId(porfolio.id);
     return await this.portfolioService.removePortfolio(porfolio.id);
   }
 }

@@ -10,6 +10,7 @@ import { TransactionService } from './transaction.service';
 import { PortfolioAssetService } from './portfolio-asset.service';
 import { $log } from '@tsed/logger';
 import { UserSocketService } from '../sockets/user-socket.service';
+import { PortfolioWithAssets } from '../models/portfolio-with-assets';
 
 type TransactionMap = {[coin: string]: Transaction[]};
 
@@ -30,7 +31,7 @@ export class SyncService {
 
   async finishUserSync(userId: number): Promise<boolean> {
     try {
-      await this.finishPortfolioSync(userId);
+      await this.processPortfolio(userId);
     } catch(error) {
       $log.info(error)
       return false;
@@ -38,10 +39,10 @@ export class SyncService {
     return true;
   }
 
-  finishExchangeSync = async (userId, exchangeId, transactions: Transaction[]): Promise<Transaction[]> => {
+  finishExchangeSync = async (userId, exchangeId, transactions: Transaction[], lastOffset: number): Promise<Transaction[]> => {
     await this.transactionService.saveTransactions(exchangeId, transactions || []);
 
-    await this.exchangeService.updateExchangeSyncStatus(exchangeId, SyncStatus.SYNCED);
+    await this.exchangeService.updateExchangeSyncStatus(exchangeId, SyncStatus.SYNCED, lastOffset);
 
     if (await this.isUserSynced(userId)) {
       await this.finishUserSync(userId);
@@ -83,7 +84,7 @@ export class SyncService {
   async fetchTransactionsForSync(userId: number, exchange: Exchange): Promise<boolean> {
     $log.info("starting sync for exhange", exchange.id, exchange.name);
     const exchangeClient = this.exchangeClientFactoryService.getClientById(userId, exchange);
-    return await exchangeClient.getTransactions(userId, exchange.id, this.finishExchangeSync);
+    return await exchangeClient.getTransactions(userId, exchange.id, exchange.lastOffset, this.finishExchangeSync);
   }
 
   async forcePortfolioSync(userId: number): Promise<Portfolio> {
@@ -119,13 +120,18 @@ export class SyncService {
     return transactionMap;
   }
 
-  async finishPortfolioSync(userId: number): Promise<Portfolio> {
+  async processPortfolio(userId: number, updateSyncStatus = true): Promise<Portfolio> {
     const portfolio = await this.portfolioService.getByUserId(userId);
-    const transactionMap =await this.getUserTransactions(userId);
+    const transactionMap = await this.getUserTransactions(userId);
     for (const coin of Object.keys(transactionMap)) {
       await this.portfolioAssetService.convertTransactionsToAsset(portfolio.id, transactionMap[coin])
     }
-    const finishedPortfolio = await this.portfolioService.updateSyncStatus(portfolio.id, SyncStatus.SYNCED, true);
+    let finishedPortfolio: PortfolioWithAssets;
+    if (updateSyncStatus) {
+      finishedPortfolio = await this.portfolioService.updateSyncStatus(portfolio.id, SyncStatus.SYNCED, true);
+    } else {
+      finishedPortfolio = await this.portfolioService.getById(portfolio.id, true);
+    }
     $log.info('finishing sync');
     this.userSocketService.portfolioReceived(finishedPortfolio);
     return finishedPortfolio;

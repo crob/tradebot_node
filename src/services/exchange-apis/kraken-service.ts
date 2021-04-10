@@ -43,7 +43,7 @@ export class KrakenService extends BaseExchangeClient {
     return this.getClient().api(KrakenApi.AssetPairs)
   }
 
-  async getTransactions(userId: number, exchangeId: number, finishSyncCallback: FinishExchangeSyncCallback): Promise<boolean> {
+  async getTransactions(userId: number, exchangeId: number, lastOffset: number = null, finishSyncCallback: FinishExchangeSyncCallback): Promise<boolean> {
     if (!this.isSyncing) {
       this.isSyncing = true;
       this.userId = userId;
@@ -53,7 +53,8 @@ export class KrakenService extends BaseExchangeClient {
 
       try {
         await this.getTradablePairs();
-        const tradeHistory = await this.recursivlyFetchAccountHistory();
+        this.lastOffset = lastOffset;
+        const tradeHistory = await this.recursivlyFetchAccountHistory(lastOffset || 0);
         this.syncedTransactions = this.convertHistoryToTransactions(tradeHistory).filter((transction: Transaction) => transction.coin !== 'USDC');
         $log.info('finishing kraken?', exchangeId)
         this.finishSync();
@@ -89,6 +90,8 @@ export class KrakenService extends BaseExchangeClient {
     if (response.result.count > size) {
       return await this.recursivlyFetchAccountHistory(size, tradeHistory);
     } else {
+      $log.info("adding to lastOffset", this.lastOffset, response.result.count)
+      // this.lastOffset += response.result.count;
       return tradeHistory;
     }
   }
@@ -128,7 +131,7 @@ export class KrakenService extends BaseExchangeClient {
   normalizeKrakenCoin(tradePairKey: string): string {
     if (this.tradingPairs[tradePairKey]) {
       let baseName = this.tradingPairs[tradePairKey].base;
-      // like lets randomly throw an extra X infront of the coin pair name?
+      // like lets randomly throw an extra X infront of the coin name?
       if (baseName.length === 4 && baseName[0] === 'X') {
         baseName = baseName.substr(1);
       }

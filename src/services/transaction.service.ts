@@ -1,4 +1,4 @@
-import { Transaction } from '@prisma/client';
+import { Transaction, Prisma } from '@prisma/client';
 import { Injectable } from '@tsed/di';
 import { PrismaService } from './prisma-service';
 
@@ -13,8 +13,8 @@ export class TransactionService {
     });
   }
 
-  async saveTransactions(exchangeId: number, transactions: Transaction[]) {
-    await this.deleteTransactionsForExchange(exchangeId);
+  async saveTransactions(exchangeId: number, transactions: Transaction[], keepManual = true) {
+    await this.deleteTransactionsForExchange(exchangeId, keepManual);
     transactions.forEach(async (transaction: Transaction) => {
       await PrismaService.getInstance().connection.transaction.create({
         data: transaction
@@ -22,11 +22,17 @@ export class TransactionService {
     });
   }
 
-  async deleteTransactionsForExchange(exchangeId: number) {
+  async deleteTransactionsForExchange(exchangeId: number, keepManual = true) {
+    const where =  {
+      exchangeId
+    } as any;
+
+    if (!keepManual) {
+      where.isManuallyAdded = false
+    }
+
     return await PrismaService.getInstance().connection.transaction.deleteMany({
-      where: {
-        exchangeId
-      }
+      where
     });
   }
 }

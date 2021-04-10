@@ -30,11 +30,22 @@ enum OrderType {
 enum SideType {
   BUY
   SELL
+  REWARD
+  DEPOSIT
+  WITHDRAWAL
 }
 
 enum TaxEventType {
   LOSS
   GAIN
+  EVEN
+}
+
+enum TaxStrategy {
+  FirstInFirstOut
+  FirstInLastOut
+  LastInFirstOut
+  PrioritizeLongTerm
 }
 
 model Exchange {
@@ -42,6 +53,7 @@ model Exchange {
   name         ExchangeName  @default(COINBASEPRO)
   apiKey       String        @unique
   apiSecret    String        @unique
+  salt         String        @default("")
   apiThird     String?       @unique
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -49,19 +61,57 @@ model Exchange {
   syncStatus   SyncStatus    @default(NOT_SYNCED)
   user         User          @relation(fields: [userId], references: [id])
   userId       Int
+  lastOffset   Float?
   transactions Transaction[]
 }
 
 model PortfolioAsset {
-  id           Int       @id @default(autoincrement())
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  coin         String
-  amount       Float
-  averagePrice Float
-  total        Float
-  portfolio    Portfolio @relation(fields: [portfolioId], references: [id])
-  portfolioId  Int
+  id               Int        @id @default(autoincrement())
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  coin             String
+  amount           Float
+  averagePrice     Float
+  totalInvested    Float      @default(0)
+  holdings         Holding[]
+  taxEvents        TaxEvent[]
+  portfolio        Portfolio  @relation(fields: [portfolioId], references: [id])
+  portfolioId      Int
+  realizedPnLShort Float      @default(0)
+  realizedPnLLong  Float      @default(0)
+}
+
+model Holding {
+  id               Int            @id @default(autoincrement())
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  tradedAt         DateTime
+  coin             String
+  amount           Float
+  purchasePrice    Float
+  fees             Float          @default(0)
+  side             SideType       @default(BUY)
+  isManuallyAdded  Boolean        @default(false)
+  portfolioAsset   PortfolioAsset @relation(fields: [portfolioAssetId], references: [id])
+  portfolioAssetId Int
+}
+
+model TaxEvent {
+  id               Int            @id @default(autoincrement())
+  portfolioAsset   PortfolioAsset @relation(fields: [portfolioAssetId], references: [id])
+  portfolioAssetId Int
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  taxedAt          DateTime
+  coin             String
+  type             TaxEventType
+  amount           Float
+  salePrice        Float
+  totalValue       Float
+  spnl             Float          @default(0)
+  lpnl             Float          @default(0)
+  transactionId    Int
+  Transaction      Transaction[]
 }
 
 model Portfolio {
@@ -76,38 +126,27 @@ model Portfolio {
 }
 
 model Transaction {
-  id              Int        @id @default(autoincrement())
-  exchange        Exchange   @relation(fields: [exchangeId], references: [id])
+  id              Int         @id @default(autoincrement())
+  exchange        Exchange    @relation(fields: [exchangeId], references: [id])
   exchangeId      Int
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
   openedAt        DateTime
   doneAt          DateTime
   coin            String
   coinName        String?
   purchasePrice   Float
   amount          Float
-  fees            Float      @default(0)
+  fees            Float       @default(0)
   type            OrderType
   post            Boolean
   settled         Boolean
   filled          Boolean
-  side            SideType   @default(BUY)
-  isManuallyAdded Boolean    @default(false)
-  TaxEvent        TaxEvent[]
-}
-
-model TaxEvent {
-  id            Int          @id @default(autoincrement())
-  transaction   Transaction  @relation(fields: [transactionId], references: [id])
-  transactionId Int
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  taxedAt       DateTime
-  coin          String
-  isLongTerm    Boolean
-  type          TaxEventType
-  amount        Float
+  side            SideType    @default(BUY)
+  isManuallyAdded Boolean     @default(false)
+  taxEvent        TaxEvent?   @relation(fields: [taxEventId], references: [id])
+  taxStrategy     TaxStrategy @default(PrioritizeLongTerm)
+  taxEventId      Int?
 }
 
 model User {
