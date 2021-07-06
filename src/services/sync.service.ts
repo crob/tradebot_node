@@ -90,6 +90,7 @@ export class SyncService {
   async forcePortfolioSync(userId: number): Promise<Portfolio> {
     const portfolio = await this.portfolioService.getOrCreatePortfolio(userId);
     this.queueSyncPortfolio(portfolio.id);
+    portfolio.syncStatus = SyncStatus.SYNCING;
     return portfolio;
   }
 

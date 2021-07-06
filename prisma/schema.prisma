@@ -59,6 +59,7 @@ model Exchange {
   updatedAt    DateTime      @updatedAt
   lastSyncAt   DateTime?
   syncStatus   SyncStatus    @default(NOT_SYNCED)
+  nickname     String?       @default("")
   user         User          @relation(fields: [userId], references: [id])
   userId       Int
   lastOffset   Float?

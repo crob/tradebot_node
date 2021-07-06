@@ -8,4 +8,5 @@ export interface ExchangeView {
   apiThird?: string | null;
   lastSyncAt: Date;
   userId: number;
+  nickname?: string;
 }

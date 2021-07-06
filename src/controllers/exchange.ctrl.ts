@@ -10,6 +10,7 @@ import { ValidationKeyword } from '../enums';
 import { TransactionService } from '../services/transaction.service';
 import { SyncService } from '../services/sync.service';
 import { ExchangeClientFactoryService } from '../services/exchange-apis';
+import { UserSocketService } from '../sockets/user-socket.service';
 
 @Controller("/exchanges")
 export class ExchangeCtl {
@@ -17,7 +18,8 @@ export class ExchangeCtl {
     private readonly exchangeService: ExchangeService,
     private readonly syncService: SyncService,
     private readonly exchangeClientFactoryService: ExchangeClientFactoryService,
-    private transactionService: TransactionService
+    private transactionService: TransactionService,
+    private readonly userSocketService: UserSocketService
   ) {}
 
   @Authorize()
@@ -85,6 +87,7 @@ export class ExchangeCtl {
       });
     this.exchangeClientFactoryService.addClientToUser(newExchange.userId, newExchange);
     this.syncService.forcePortfolioSync(exchange.userId);
+    // userSocketService
     return this.exchangeService.removeSensativeExchangeInfo(newExchange);
   }
 }

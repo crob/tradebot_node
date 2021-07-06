@@ -1,5 +1,5 @@
 import {SocketService, IO, Socket, Input, Emit, Args, SocketSession, Nsp} from "@tsed/socketio";
-import { Portfolio } from '@prisma/client';
+import { Exchange, Portfolio } from '@prisma/client';
 import { GenericReduxSocketEvent } from '../models/generic-reduc-socket-event';
 import { $log } from '@tsed/common';
 
@@ -18,7 +18,11 @@ export class UserSocketService {
     }
 
     async portfolioReceived(portfolio: Portfolio) {
-        return this.emitUserReduxEvent(portfolio.userId, 'portfolio/portfolioReceived', portfolio);
+      return this.emitUserReduxEvent(portfolio.userId, 'portfolio/portfolioReceived', portfolio);
+    }
+
+    async exchangesReceived(userId: number, exchanges: Exchange[]) {
+      return this.emitUserReduxEvent(userId, 'exchanges/exchangesReceived', exchanges);
     }
 
     @Emit("socket::user::event")
